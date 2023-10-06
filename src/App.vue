@@ -83,16 +83,18 @@
           v-for="ticker in tickersList"
           :key="ticker.id"
           @click="handleSelectTicker(ticker)"
-          class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
+          class="bg-white overflow-hidden shadow rounded-lg border-4 border-transparent border-solid cursor-pointer"
+          :class="ticker?.id === selectedTicker?.id && 'border-4 border-purple-800'"
         >
           <div class="px-4 py-5 sm:p-6 text-center">
             <dt class="text-sm font-medium text-gray-500 truncate">
-              {{ `${currency.symbol} - USD` }}
+              {{ `${ticker.symbol} - USD` }}
             </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ currency.price }}</dd>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ ticker.price }}</dd>
           </div>
           <div class="w-full border-t border-gray-200"></div>
           <button
+            @click="handleDeleteTicker(ticker)"
             class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
           >
             <svg
@@ -111,140 +113,40 @@
             Удалить
           </button>
         </div>
-        <!-- <div
-          class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid border-4 cursor-pointer"
-        >
-          <div class="px-4 py-5 sm:p-6 text-center">
-            <dt class="text-sm font-medium text-gray-500 truncate">
-              VUE - RUB
-            </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">
-              80000.00
-            </dd>
-          </div>
-          <div class="w-full border-t border-gray-200"></div>
-          <button
-            class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
-          >
-            <svg
-              class="h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="#718096"
-              aria-hidden="true"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              ></path></svg>Удалить
-          </button>
-        </div> -->
-        <!-- <div
-          class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-        >
-          <div class="px-4 py-5 sm:p-6 text-center">
-            <dt class="text-sm font-medium text-gray-500 truncate">
-              BTC - USD
-            </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">
-              99999.99
-            </dd>
-          </div>
-          <div class="w-full border-t border-gray-200"></div>
-          <button
-            class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
-          >
-            <svg
-              class="h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="#718096"
-              aria-hidden="true"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              ></path></svg>Удалить
-          </button>
-        </div> -->
-        <!-- <div
-          class="bg-white overflow-hidden shadow rounded-lg border-purple-800 border-solid cursor-pointer"
-        >
-          <div class="px-4 py-5 sm:p-6 text-center">
-            <dt class="text-sm font-medium text-gray-500 truncate">
-              DOGE - USD
-            </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">
-              0.0014
-            </dd>
-          </div>
-          <div class="w-full border-t border-gray-200"></div>
-          <button
-            class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
-          >
-            <svg
-              class="h-5 w-5"
-              xmlns="http://www.w3.org/2000/svg"
-              viewBox="0 0 20 20"
-              fill="#718096"
-              aria-hidden="true"
-            >
-              <path
-                fill-rule="evenodd"
-                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
-                clip-rule="evenodd"
-              ></path></svg>Удалить
-          </button>
-        </div> -->
       </dl>
       <hr v-if="tickersList.length" class="w-full border-t border-gray-600 my-4" />
-      <!-- <section class="relative">
-      <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
-        VUE - USD
-      </h3>
-      <div class="flex items-end border-gray-600 border-b border-l h-64">
-        <div
-          class="bg-purple-800 border w-10 h-24"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-32"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-48"
-        ></div>
-        <div
-          class="bg-purple-800 border w-10 h-16"
-        ></div>
-      </div>
-      <button
-        type="button"
-        class="absolute top-0 right-0"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          xmlns:xlink="http://www.w3.org/1999/xlink"
-          xmlns:svgjs="http://svgjs.com/svgjs"
-          version="1.1"
-          width="30"
-          height="30"
-          x="0"
-          y="0"
-          viewBox="0 0 511.76 511.76"
-          style="enable-background:new 0 0 512 512"
-          xml:space="preserve"
-        >
-          <g>
-            <path
-              d="M436.896,74.869c-99.84-99.819-262.208-99.819-362.048,0c-99.797,99.819-99.797,262.229,0,362.048    c49.92,49.899,115.477,74.837,181.035,74.837s131.093-24.939,181.013-74.837C536.715,337.099,536.715,174.688,436.896,74.869z     M361.461,331.317c8.341,8.341,8.341,21.824,0,30.165c-4.16,4.16-9.621,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    l-75.413-75.435l-75.392,75.413c-4.181,4.16-9.643,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    c-8.341-8.341-8.341-21.845,0-30.165l75.392-75.413l-75.413-75.413c-8.341-8.341-8.341-21.845,0-30.165    c8.32-8.341,21.824-8.341,30.165,0l75.413,75.413l75.413-75.413c8.341-8.341,21.824-8.341,30.165,0    c8.341,8.32,8.341,21.824,0,30.165l-75.413,75.413L361.461,331.317z"
-              fill="#718096"
-              data-original="#000000"
-            ></path>
-          </g>
-        </svg>
-      </button>
-    </section> -->
+      <section v-if="selectedTicker" class="relative">
+        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">VUE - USD</h3>
+        <div class="flex items-end border-gray-600 border-b border-l h-64">
+          <div class="bg-purple-800 border w-10 h-24"></div>
+          <div class="bg-purple-800 border w-10 h-32"></div>
+          <div class="bg-purple-800 border w-10 h-48"></div>
+          <div class="bg-purple-800 border w-10 h-16"></div>
+        </div>
+        <button type="button" class="absolute top-0 right-0">
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            xmlns:xlink="http://www.w3.org/1999/xlink"
+            xmlns:svgjs="http://svgjs.com/svgjs"
+            version="1.1"
+            width="30"
+            height="30"
+            x="0"
+            y="0"
+            viewBox="0 0 511.76 511.76"
+            style="enable-background: new 0 0 512 512"
+            xml:space="preserve"
+          >
+            <g>
+              <path
+                d="M436.896,74.869c-99.84-99.819-262.208-99.819-362.048,0c-99.797,99.819-99.797,262.229,0,362.048    c49.92,49.899,115.477,74.837,181.035,74.837s131.093-24.939,181.013-74.837C536.715,337.099,536.715,174.688,436.896,74.869z     M361.461,331.317c8.341,8.341,8.341,21.824,0,30.165c-4.16,4.16-9.621,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    l-75.413-75.435l-75.392,75.413c-4.181,4.16-9.643,6.251-15.083,6.251c-5.461,0-10.923-2.091-15.083-6.251    c-8.341-8.341-8.341-21.845,0-30.165l75.392-75.413l-75.413-75.413c-8.341-8.341-8.341-21.845,0-30.165    c8.32-8.341,21.824-8.341,30.165,0l75.413,75.413l75.413-75.413c8.341-8.341,21.824-8.341,30.165,0    c8.341,8.32,8.341,21.824,0,30.165l-75.413,75.413L361.461,331.317z"
+                fill="#718096"
+                data-original="#000000"
+              ></path>
+            </g>
+          </svg>
+        </button>
+      </section>
     </div>
   </div>
 </template>
@@ -260,7 +162,9 @@ export default {
       currencyById: {},
       matchedCurrency: [],
       inputValueCurrency: '',
-      showError: false
+      showError: false,
+      selectedTicker: null,
+      graph: []
     }
   },
   watch: {
@@ -278,8 +182,6 @@ export default {
       })
       const fetchedCurrency = await res.json()
 
-      console.log(Object.keys(fetchedCurrency.Data))
-
       this.currencyById = fetchedCurrency.Data
       this.fetchedCurrencyList = Object.keys(fetchedCurrency.Data)
     }
@@ -288,15 +190,9 @@ export default {
   },
   methods: {
     checkTicker(symbol) {
-      return this.tickersList.find((t) => {
-        console.log(
-          t.symbol.toLowerCase(),
-          symbol.toLowerCase(),
-          t.symbol.toLowerCase() === symbol.toLowerCase()
-        )
-        return t.symbol.toLowerCase() === symbol.toLowerCase()
-      })
+      return this.tickersList.find((t) => t.symbol.toLowerCase() === symbol.toLowerCase())
     },
+
     async fetchCurrencyPrice(symbolCurrency, priceCurrency) {
       const res = await fetch(
         `https://min-api.cryptocompare.com/data/price?fsym=${symbolCurrency}&tsyms=${priceCurrency}`,
@@ -331,13 +227,23 @@ export default {
 
       setInterval(async () => {
         const fetchedPrice = await this.fetchCurrencyPrice(currency, 'USD')
+        const price =
+          fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
 
-        this.tickersList.find((t) => t.symbol === newTicker.symbol).price = fetchedPrice.USD
-      }, 2000)
+        this.tickersList.find((t) => t.symbol === newTicker.symbol).price = price
+      }, 4000)
     },
 
     handleSelectTicker(ticker) {
-      console.log({ ticker })
+      this.selectedTicker = ticker
+    },
+
+    handleDeleteTicker(ticker) {
+      const newList = this.tickersList.filter(
+        (t) => t.symbol.toLowerCase() !== ticker.symbol.toLowerCase()
+      )
+
+      this.tickersList = newList
     }
   },
   computed: {

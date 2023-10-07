@@ -94,7 +94,7 @@
           </div>
           <div class="w-full border-t border-gray-200"></div>
           <button
-            @click="handleDeleteTicker(ticker)"
+            @click.stop="handleDeleteTicker(ticker)"
             class="flex items-center justify-center font-medium w-full bg-gray-100 px-4 py-4 sm:px-6 text-md text-gray-500 hover:text-gray-600 hover:bg-gray-200 hover:opacity-20 transition-all focus:outline-none"
           >
             <svg
@@ -118,12 +118,14 @@
       <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">VUE - USD</h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
-          <div class="bg-purple-800 border w-10 h-24"></div>
-          <div class="bg-purple-800 border w-10 h-32"></div>
-          <div class="bg-purple-800 border w-10 h-48"></div>
-          <div class="bg-purple-800 border w-10 h-16"></div>
+          <div
+            v-for="graphItem in normalizeGraph()"
+            :key="graphItem"
+            :style="{ height: `${graphItem}%` }"
+            class="bg-purple-800 border w-10"
+          ></div>
         </div>
-        <button type="button" class="absolute top-0 right-0">
+        <button @click="handleCleanGraph" type="button" class="absolute top-0 right-0">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -218,24 +220,29 @@ export default {
 
       this.showError = false
 
-      const newTicker = {
+      const currentTicker = {
         ...this.currencyById[currency],
         price: ' - '
       }
 
-      this.tickersList.push(newTicker)
+      this.tickersList.push(currentTicker)
 
       setInterval(async () => {
         const fetchedPrice = await this.fetchCurrencyPrice(currency, 'USD')
         const price =
           fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
 
-        this.tickersList.find((t) => t.symbol === newTicker.symbol).price = price
+        this.tickersList.find((t) => t.symbol === currentTicker.symbol).price = price
+
+        if (this.selectedTicker.symbol.toLowerCase() === currentTicker.symbol.toLowerCase()) {
+          this.graph.push(fetchedPrice.USD)
+        }
       }, 4000)
     },
 
     handleSelectTicker(ticker) {
       this.selectedTicker = ticker
+      this.graph = []
     },
 
     handleDeleteTicker(ticker) {
@@ -243,7 +250,25 @@ export default {
         (t) => t.symbol.toLowerCase() !== ticker.symbol.toLowerCase()
       )
 
+      if (ticker.id === this.selectedTicker.id) {
+        this.handleCleanGraph()
+      }
+
       this.tickersList = newList
+    },
+
+    handleCleanGraph() {
+      this.selectedTicker = null
+    },
+
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph)
+      const minValue = Math.min(...this.graph)
+      const newGraph = this.graph.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      )
+
+      return newGraph
     }
   },
   computed: {

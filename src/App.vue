@@ -29,7 +29,7 @@
       <section>
         <div class="flex">
           <div class="max-w-xs">
-            <label for="wallet" class="block text-sm font-medium text-gray-700">Тикер</label>
+            <label for="wallet" class="block text-sm font-medium text-gray-700">Ticker</label>
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="inputValueCurrency"
@@ -38,7 +38,7 @@
                 name="wallet"
                 id="wallet"
                 class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
-                placeholder="Например DOGE"
+                placeholder="For example DOGE"
               />
             </div>
 
@@ -74,14 +74,50 @@
               d="M13 7h-2v4H7v2h4v4h2v-4h4v-2h-4V7zm-1-5C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8z"
             ></path>
           </svg>
-          Добавить
+          Add
         </button>
       </section>
 
-      <hr v-if="tickersList.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
+
+      <div class="flex justify-between">
+        <div class="max-w-xs">
+          <label for="filterInput" class="block text-sm font-medium text-gray-700">Filter:</label>
+          <div class="mt-1 relative rounded-md shadow-md">
+            <input
+              v-model="filterValue"
+              v-on:keyup.enter="onFilter(filterValue)"
+              type="text"
+              name="filterInput"
+              id="filterInput"
+              class="block w-full pr-10 border-gray-300 text-gray-900 focus:outline-none focus:ring-gray-500 focus:border-gray-500 sm:text-sm rounded-md"
+              placeholder="Please, input filter value"
+            />
+          </div>
+        </div>
+
+        <div>
+          <button
+            type="button"
+            class="m-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            {{ '<— Prev page' }}
+          </button>
+
+          <button
+            type="button"
+            class="m-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
+          >
+            {{ 'Next page —>' }}
+          </button>
+        </div>
+      </div>
+
+      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
+
       <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div
-          v-for="ticker in tickersList"
+          v-for="ticker in filteredTickersList"
           :key="ticker.id"
           @click="handleSelectTicker(ticker)"
           class="bg-white overflow-hidden shadow rounded-lg border-4 border-transparent border-solid cursor-pointer"
@@ -115,13 +151,15 @@
           </button>
         </div>
       </dl>
-      <hr v-if="tickersList.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
       <section v-if="selectedTicker" class="relative">
-        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">VUE - USD</h3>
+        <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
+          {{ selectedTicker.symbol }} - USD
+        </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="graphItem in normalizeGraph()"
-            :key="graphItem"
+            v-for="(graphItem, index) in normalizeGraph()"
+            :key="index"
             :style="{ height: `${graphItem}%` }"
             class="bg-purple-800 border w-10"
           ></div>
@@ -162,18 +200,23 @@ export default {
       MY_API_KEY: '31ccf75561fc8823fddcafbaf3aaa73a2103801aed07e9b1129e734088f1ec5e',
       fetchedCurrencyList: [],
       tickersList: [],
+      filteredTickersList: [],
       currencyById: {},
       matchedCurrency: [],
       inputValueCurrency: '',
       showError: false,
       selectedTicker: null,
       graph: [],
-      tickersListStorageKey: 'tickets-list'
+      tickersListStorageKey: 'tickets-list',
+      filterValue: ''
     }
   },
   watch: {
     inputValueCurrency() {
       this.showError = false
+    },
+    filterValue() {
+      this.onFilter()
     }
   },
   mounted() {
@@ -202,8 +245,16 @@ export default {
 
     fetchCurrencyList()
     getStorageTickersList()
+    this.onFilter()
   },
   methods: {
+    onFilter() {
+      const filteredTicketsList = this.tickersList.filter((ticket) =>
+        ticket.symbol.includes(this.filterValue.toUpperCase())
+      )
+
+      this.filteredTickersList = filteredTicketsList
+    },
     checkTicker(symbol) {
       return this.tickersList.find((t) => t.symbol.toLowerCase() === symbol.toLowerCase())
     },
@@ -227,15 +278,20 @@ export default {
     fetchPrice(name) {
       setInterval(async () => {
         const fetchedPrice = await this.fetchCurrencyPrice(name, 'USD')
+
+        console.log(fetchedPrice.USD, { fetchedPrice })
         const price =
           fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
 
         this.tickersList.find((t) => t.symbol === name).price = price
 
-        if (this.selectedTicker.symbol.toLowerCase() === name.toLowerCase()) {
+        if (
+          this.selectedTicker &&
+          this.selectedTicker.symbol.toLowerCase() === name.toLowerCase()
+        ) {
           this.graph.push(fetchedPrice.USD)
         }
-      }, 2000)
+      }, 4000)
     },
 
     async handleAddCurrency(currency) {
@@ -248,6 +304,7 @@ export default {
       if (!this.fetchedCurrencyList.includes(currency.toUpperCase())) return
 
       this.showError = false
+      this.filterValue = ''
 
       const currentTicker = {
         ...this.currencyById[currency.toUpperCase()],

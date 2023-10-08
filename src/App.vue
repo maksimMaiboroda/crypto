@@ -33,6 +33,7 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="inputValueCurrency"
+                v-on:keyup.enter="handleAddCurrency(inputValueCurrency)"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -166,7 +167,8 @@ export default {
       inputValueCurrency: '',
       showError: false,
       selectedTicker: null,
-      graph: []
+      graph: [],
+      tickersListStorageKey: 'tickets-list'
     }
   },
   watch: {
@@ -188,7 +190,18 @@ export default {
       this.fetchedCurrencyList = Object.keys(fetchedCurrency.Data)
     }
 
+    const getStorageTickersList = () => {
+      const tickersList = localStorage.getItem(this.tickersListStorageKey)
+
+      this.tickersList = JSON.parse(tickersList)
+
+      for (const ticker of this.tickersList) {
+        this.fetchPrice(ticker.symbol)
+      }
+    }
+
     fetchCurrencyList()
+    getStorageTickersList()
   },
   methods: {
     checkTicker(symbol) {
@@ -211,6 +224,20 @@ export default {
       return fetchedCurrencyPrice
     },
 
+    fetchPrice(name) {
+      setInterval(async () => {
+        const fetchedPrice = await this.fetchCurrencyPrice(name, 'USD')
+        const price =
+          fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
+
+        this.tickersList.find((t) => t.symbol === name).price = price
+
+        if (this.selectedTicker.symbol.toLowerCase() === name.toLowerCase()) {
+          this.graph.push(fetchedPrice.USD)
+        }
+      }, 2000)
+    },
+
     async handleAddCurrency(currency) {
       if (this.checkTicker(currency)) {
         this.showError = true
@@ -218,31 +245,25 @@ export default {
         return
       }
 
+      if (!this.fetchedCurrencyList.includes(currency.toUpperCase())) return
+
       this.showError = false
 
       const currentTicker = {
-        ...this.currencyById[currency],
+        ...this.currencyById[currency.toUpperCase()],
         price: ' - '
       }
 
       this.tickersList.push(currentTicker)
 
-      setInterval(async () => {
-        const fetchedPrice = await this.fetchCurrencyPrice(currency, 'USD')
-        const price =
-          fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
+      localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
 
-        this.tickersList.find((t) => t.symbol === currentTicker.symbol).price = price
-
-        if (this.selectedTicker.symbol.toLowerCase() === currentTicker.symbol.toLowerCase()) {
-          this.graph.push(fetchedPrice.USD)
-        }
-      }, 4000)
+      this.fetchPrice(currency.toUpperCase())
     },
 
     handleSelectTicker(ticker) {
+      this.handleCleanGraph()
       this.selectedTicker = ticker
-      this.graph = []
     },
 
     handleDeleteTicker(ticker) {
@@ -250,15 +271,16 @@ export default {
         (t) => t.symbol.toLowerCase() !== ticker.symbol.toLowerCase()
       )
 
-      if (ticker.id === this.selectedTicker.id) {
+      if (this.selectedTicker && ticker.id === this.selectedTicker.id) {
         this.handleCleanGraph()
       }
 
       this.tickersList = newList
+      localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
     },
 
     handleCleanGraph() {
-      this.selectedTicker = null
+      this.graph = []
     },
 
     normalizeGraph() {

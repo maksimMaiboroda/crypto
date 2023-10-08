@@ -55,7 +55,7 @@
                 {{ currency }}
               </span>
             </div>
-            <div v-if="showError" class="text-sm text-red-600">Такой тикер уже добавлен</div>
+            <div v-if="showError" class="text-sm text-red-600">This ticker is already exist!</div>
           </div>
         </div>
         <button
@@ -99,6 +99,8 @@
         <div>
           <button
             type="button"
+            v-show="pageNumber > 1"
+            @click="handleClickPageBth('prev')"
             class="m-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
             {{ '<— Prev page' }}
@@ -106,6 +108,8 @@
 
           <button
             type="button"
+            v-show="pageSize * pageNumber < tickersList.length"
+            @click="handleClickPageBth('next')"
             class="m-4 inline-flex items-center py-2 px-4 border border-transparent shadow-sm text-sm leading-4 font-medium rounded-full text-white bg-gray-600 hover:bg-gray-700 transition-colors duration-300 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500"
           >
             {{ 'Next page —>' }}
@@ -147,7 +151,7 @@
                 clip-rule="evenodd"
               ></path>
             </svg>
-            Удалить
+            Delete
           </button>
         </div>
       </dl>
@@ -208,7 +212,9 @@ export default {
       selectedTicker: null,
       graph: [],
       tickersListStorageKey: 'tickets-list',
-      filterValue: ''
+      filterValue: '',
+      pageNumber: 1,
+      pageSize: 6
     }
   },
   watch: {
@@ -253,8 +259,21 @@ export default {
         ticket.symbol.includes(this.filterValue.toUpperCase())
       )
 
-      this.filteredTickersList = filteredTicketsList
+      this.filteredTickersList = this.onPaginated(filteredTicketsList)
     },
+
+    onPaginated(items) {
+      const page = this.pageNumber // 2
+      const pageSize = this.pageSize // 6
+
+      const lastIndex = page * pageSize // 12
+      const firstIndex = lastIndex - pageSize // 7
+
+      const newList = items.slice(firstIndex, lastIndex)
+
+      return newList
+    },
+
     checkTicker(symbol) {
       return this.tickersList.find((t) => t.symbol.toLowerCase() === symbol.toLowerCase())
     },
@@ -279,7 +298,6 @@ export default {
       setInterval(async () => {
         const fetchedPrice = await this.fetchCurrencyPrice(name, 'USD')
 
-        console.log(fetchedPrice.USD, { fetchedPrice })
         const price =
           fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
 
@@ -312,6 +330,7 @@ export default {
       }
 
       this.tickersList.push(currentTicker)
+      this.onFilter()
 
       localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
 
@@ -348,6 +367,20 @@ export default {
       )
 
       return newGraph
+    },
+
+    handleClickPageBth(action) {
+      if (action === 'next') {
+        this.pageNumber = this.pageNumber + 1
+
+        this.onFilter()
+      }
+
+      if (action === 'prev' && this.pageNumber !== 1) {
+        this.pageNumber = this.pageNumber - 1
+
+        this.onFilter()
+      }
     }
   },
   computed: {

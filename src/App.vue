@@ -33,7 +33,7 @@
             <div class="mt-1 relative rounded-md shadow-md">
               <input
                 v-model="inputValueCurrency"
-                v-on:keyup.enter="handleAddCurrency(inputValueCurrency)"
+                v-on:keyup.enter="handleAddTicker(inputValueCurrency)"
                 type="text"
                 name="wallet"
                 id="wallet"
@@ -43,13 +43,13 @@
             </div>
 
             <div
-              v-if="matchedCurrencyValue.length"
+              v-if="matchedCurrencies.length"
               class="flex bg-white shadow-md p-1 rounded-md shadow-md flex-wrap"
             >
               <span
-                v-for="currency in matchedCurrencyValue"
+                v-for="currency in matchedCurrencies"
                 :key="currency"
-                @click="handleAddCurrency(currency)"
+                @click="handleAddTicker(currency)"
                 class="inline-flex items-center px-2 m-1 rounded-md text-xs font-medium bg-gray-300 text-gray-800 cursor-pointer"
               >
                 {{ currency }}
@@ -78,7 +78,7 @@
         </button>
       </section>
 
-      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
 
       <div class="flex justify-between">
         <div class="max-w-xs">
@@ -86,7 +86,6 @@
           <div class="mt-1 relative rounded-md shadow-md">
             <input
               v-model="filterValue"
-              v-on:keyup.enter="onFilter(filterValue)"
               type="text"
               name="filterInput"
               id="filterInput"
@@ -117,11 +116,11 @@
         </div>
       </div>
 
-      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
 
       <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div
-          v-for="ticker in filteredTickersList"
+          v-for="ticker in listWithAllFilters"
           :key="ticker.id"
           @click="handleSelectTicker(ticker)"
           class="bg-white overflow-hidden shadow rounded-lg border-4 border-transparent border-solid cursor-pointer"
@@ -155,14 +154,14 @@
           </button>
         </div>
       </dl>
-      <hr v-if="filteredTickersList.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
       <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.symbol }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(graphItem, index) in normalizeGraph()"
+            v-for="(graphItem, index) in normalizeGraph"
             :key="index"
             :style="{ height: `${graphItem}%` }"
             class="bg-purple-800 border w-10"
@@ -197,22 +196,33 @@
 </template>
 
 <script>
+import { getCurrencyList, fetchCurrencyPrice } from './api'
+
 export default {
+  // -- Refactoring --
+
+  // [ ] 6. There are dependent data in state | Critical: 5+
+  // [ ] 2. When delete ticker, subscribe on updating ticket should remove too | Critical: 5
+  // [ ] 4. Api calls just in component (???) | Critical: 5
+  // [ ] 5. Errors handling API | Critical: 5
+  // [ ] 8. When ticker deleting the localStorage don't change | Critical: 4
+  // [ ] 3. Many extra calls to api | Critical: 4
+  // [ ] 1. The same code in watch | Critical: 3
+  // [ ] 7. Graphic looks bad when many prices | Critical: 2
+  // [ ] 9. localStorage and incognito mode | Critical: 2
+  // [ ] 10. Magic strings and numbers | Critical: 2
+
   data() {
     return {
-      isLoading: false,
-      MY_API_KEY: '31ccf75561fc8823fddcafbaf3aaa73a2103801aed07e9b1129e734088f1ec5e',
-      fetchedCurrencyList: [],
-      tickersList: [],
-      filteredTickersList: [],
-      currencyById: {},
-      matchedCurrency: [],
       inputValueCurrency: '',
-      showError: false,
+      filterValue: '',
+      currencyById: {},
+      tickersList: [],
       selectedTicker: null,
+      isLoading: false,
+      showError: false,
       graph: [],
       tickersListStorageKey: 'tickets-list',
-      filterValue: '',
       pageNumber: 1,
       pageSize: 6
     }
@@ -222,81 +232,118 @@ export default {
       this.showError = false
     },
     filterValue() {
-      this.onFilter()
+      this.pageNumber = 1
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filterValue}&page=${this.pageNumber}`
+      )
+    },
+    pageNumber() {
+      window.history.pushState(
+        null,
+        document.title,
+        `${window.location.pathname}?filter=${this.filterValue}&page=${this.pageNumber}`
+      )
     }
   },
-  mounted() {
-    const fetchCurrencyList = async () => {
-      const res = await fetch('https://min-api.cryptocompare.com/data/blockchain/list', {
-        method: 'GET',
-        headers: {
-          authorization: `Apikey ${this.MY_API_KEY}`
-        }
-      })
-      const fetchedCurrency = await res.json()
 
-      this.currencyById = fetchedCurrency.Data
-      this.fetchedCurrencyList = Object.keys(fetchedCurrency.Data)
+  computed: {
+    currencyList() {
+      return Object.keys(this.currencyById)
+    },
+
+    matchedCurrencies() {
+      const matched = []
+
+      if (this.inputValueCurrency) {
+        for (const currency of this.currencyList) {
+          if (matched.length === 4) {
+            break
+          }
+          if (currency.toLowerCase().includes(this.inputValueCurrency.toLowerCase())) {
+            matched.push(currency)
+          }
+        }
+      }
+
+      return matched
+    },
+
+    endIndex() {
+      return this.pageNumber * this.pageSize
+    },
+
+    startIndex() {
+      return this.endIndex - this.pageSize
+    },
+
+    filteredList() {
+      return this.tickersList.filter((ticket) =>
+        ticket.symbol.includes(this.filterValue.toUpperCase())
+      )
+    },
+
+    listWithAllFilters() {
+      return this.filteredList.slice(this.startIndex, this.endIndex)
+    },
+
+    normalizeGraph() {
+      const maxValue = Math.max(...this.graph)
+      const minValue = Math.min(...this.graph)
+      const newGraph = this.graph.map(
+        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+      )
+
+      return newGraph
+    }
+  },
+
+  created() {
+    const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
+
+    if (windowData.filter) {
+      this.filterValue = windowData.filter
     }
 
-    const getStorageTickersList = () => {
-      const tickersList = localStorage.getItem(this.tickersListStorageKey)
+    if (windowData.page) {
+      this.pageNumber = windowData.page
+    }
 
+    const tickersList = localStorage.getItem(this.tickersListStorageKey)
+
+    if (tickersList) {
       this.tickersList = JSON.parse(tickersList)
 
       for (const ticker of this.tickersList) {
-        this.fetchPrice(ticker.symbol)
+        this.subscribeToUpdate(ticker.symbol)
       }
+    }
+  },
+
+  mounted() {
+    const fetchCurrencyList = async () => {
+      const fetchedCurrency = await getCurrencyList()
+      this.currencyById = fetchedCurrency
     }
 
     fetchCurrencyList()
-    getStorageTickersList()
-    this.onFilter()
   },
+
   methods: {
-    onFilter() {
-      const filteredTicketsList = this.tickersList.filter((ticket) =>
-        ticket.symbol.includes(this.filterValue.toUpperCase())
-      )
-
-      this.filteredTickersList = this.onPaginated(filteredTicketsList)
-    },
-
-    onPaginated(items) {
-      const page = this.pageNumber // 2
-      const pageSize = this.pageSize // 6
-
-      const lastIndex = page * pageSize // 12
-      const firstIndex = lastIndex - pageSize // 7
-
-      const newList = items.slice(firstIndex, lastIndex)
-
-      return newList
-    },
-
     checkTicker(symbol) {
       return this.tickersList.find((t) => t.symbol.toLowerCase() === symbol.toLowerCase())
     },
 
-    async fetchCurrencyPrice(symbolCurrency, priceCurrency) {
-      const res = await fetch(
-        `https://min-api.cryptocompare.com/data/price?fsym=${symbolCurrency}&tsyms=${priceCurrency}`,
-        {
-          method: 'GET',
-          headers: {
-            authorization: `Apikey ${this.MY_API_KEY}`
-          }
-        }
-      )
-
-      const fetchedCurrencyPrice = await res.json()
-
-      return fetchedCurrencyPrice
-    },
-
-    fetchPrice(name) {
+    subscribeToUpdate(name) {
       setInterval(async () => {
-        const fetchedPrice = await this.fetchCurrencyPrice(name, 'USD')
+        const fetchedPrice = await fetchCurrencyPrice(name, 'USD')
+
+        if (fetchedPrice?.Response === 'Error') {
+          this.tickersList.find((t) => t.symbol === name).price = ' - '
+
+          return
+        }
 
         const price =
           fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
@@ -312,14 +359,14 @@ export default {
       }, 4000)
     },
 
-    async handleAddCurrency(currency) {
+    async handleAddTicker(currency) {
       if (this.checkTicker(currency)) {
         this.showError = true
 
         return
       }
 
-      if (!this.fetchedCurrencyList.includes(currency.toUpperCase())) return
+      if (!this.currencyList.includes(currency.toUpperCase())) return
 
       this.showError = false
       this.filterValue = ''
@@ -330,11 +377,8 @@ export default {
       }
 
       this.tickersList.push(currentTicker)
-      this.onFilter()
-
       localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
-
-      this.fetchPrice(currency.toUpperCase())
+      this.subscribeToUpdate(currency.toUpperCase())
     },
 
     handleSelectTicker(ticker) {
@@ -359,46 +403,24 @@ export default {
       this.graph = []
     },
 
-    normalizeGraph() {
-      const maxValue = Math.max(...this.graph)
-      const minValue = Math.min(...this.graph)
-      const newGraph = this.graph.map(
-        (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-      )
+    // normalizeGraph() {
+    //   const maxValue = Math.max(...this.graph)
+    //   const minValue = Math.min(...this.graph)
+    //   const newGraph = this.graph.map(
+    //     (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
+    //   )
 
-      return newGraph
-    },
+    //   return newGraph
+    // },
 
     handleClickPageBth(action) {
       if (action === 'next') {
         this.pageNumber = this.pageNumber + 1
-
-        this.onFilter()
       }
 
       if (action === 'prev' && this.pageNumber !== 1) {
         this.pageNumber = this.pageNumber - 1
-
-        this.onFilter()
       }
-    }
-  },
-  computed: {
-    matchedCurrencyValue() {
-      const matched = []
-
-      if (this.inputValueCurrency) {
-        for (const currency of this.fetchedCurrencyList) {
-          if (matched.length === 4) {
-            break
-          }
-          if (currency.toLowerCase().includes(this.inputValueCurrency.toLowerCase())) {
-            matched.push(currency)
-          }
-        }
-      }
-
-      return matched
     }
   }
 }

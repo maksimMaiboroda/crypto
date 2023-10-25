@@ -78,7 +78,7 @@
         </button>
       </section>
 
-      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="filteredAndPaginatedList.length" class="w-full border-t border-gray-600 my-4" />
 
       <div class="flex justify-between">
         <div class="max-w-xs">
@@ -116,11 +116,11 @@
         </div>
       </div>
 
-      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="filteredAndPaginatedList.length" class="w-full border-t border-gray-600 my-4" />
 
       <dl class="mt-5 grid grid-cols-1 gap-5 sm:grid-cols-3">
         <div
-          v-for="ticker in listWithAllFilters"
+          v-for="ticker in filteredAndPaginatedList"
           :key="ticker.id"
           @click="handleSelectTicker(ticker)"
           class="bg-white overflow-hidden shadow rounded-lg border-4 border-transparent border-solid cursor-pointer"
@@ -154,20 +154,20 @@
           </button>
         </div>
       </dl>
-      <hr v-if="listWithAllFilters.length" class="w-full border-t border-gray-600 my-4" />
+      <hr v-if="filteredAndPaginatedList.length" class="w-full border-t border-gray-600 my-4" />
       <section v-if="selectedTicker" class="relative">
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.symbol }} - USD
         </h3>
         <div class="flex items-end border-gray-600 border-b border-l h-64">
           <div
-            v-for="(graphItem, index) in normalizeGraph"
+            v-for="(graphItem, index) in normalizedGraph"
             :key="index"
             :style="{ height: `${graphItem}%` }"
             class="bg-purple-800 border w-10"
           ></div>
         </div>
-        <button @click="handleCleanGraph" type="button" class="absolute top-0 right-0">
+        <button @click="() => (this.graph = [])" type="button" class="absolute top-0 right-0">
           <svg
             xmlns="http://www.w3.org/2000/svg"
             xmlns:xlink="http://www.w3.org/1999/xlink"
@@ -201,16 +201,25 @@ import { getCurrencyList, fetchCurrencyPrice } from './api'
 export default {
   // -- Refactoring --
 
-  // [ ] 6. There are dependent data in state | Critical: 5+
+  // [x] 6. There are dependent data in state | Critical: 5+
   // [ ] 2. When delete ticker, subscribe on updating ticket should remove too | Critical: 5
   // [ ] 4. Api calls just in component (???) | Critical: 5
   // [ ] 5. Errors handling API | Critical: 5
-  // [ ] 8. When ticker deleting the localStorage don't change | Critical: 4
+  // [x] 8. When ticker deleting the localStorage don't change | Critical: 4
   // [ ] 3. Many extra calls to api | Critical: 4
-  // [ ] 1. The same code in watch | Critical: 3
+  // [x] 1. The same code in watch | Critical: 3
   // [ ] 7. Graphic looks bad when many prices | Critical: 2
   // [ ] 9. localStorage and incognito mode | Critical: 2
   // [ ] 10. Magic strings and numbers | Critical: 2
+
+  // Also
+  //
+  // [x] Graphic doesn't work when there are the save value
+  // [ ] When delete tickets on last page user should get to previous page if it exists
+  //
+  //
+  //
+  //
 
   data() {
     return {
@@ -227,25 +236,66 @@ export default {
       pageSize: 6
     }
   },
+
+  created() {
+    const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
+    const VALID_KEYS = ['filter', 'page']
+    const tickersList = localStorage.getItem(this.tickersListStorageKey)
+
+    VALID_KEYS.forEach((key) => {
+      if (windowData[key]) {
+        this[key] = windowData[key]
+      }
+    })
+
+    if (tickersList) {
+      this.tickersList = JSON.parse(tickersList)
+
+      for (const ticker of this.tickersList) {
+        this.subscribeToUpdate(ticker.symbol)
+      }
+    }
+  },
+
+  mounted() {
+    const fetchCurrencyList = async () => {
+      const fetchedCurrency = await getCurrencyList()
+      this.currencyById = fetchedCurrency
+    }
+
+    fetchCurrencyList()
+  },
+
   watch: {
     inputValueCurrency() {
       this.showError = false
     },
+
+    tickersList() {
+      localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
+    },
+
+    selectedTicker() {
+      this.graph = []
+    },
+
     filterValue() {
       this.pageNumber = 1
-      window.history.pushState(
-        null,
-        document.title,
-        `${window.location.pathname}?filter=${this.filterValue}&page=${this.pageNumber}`
-      )
     },
-    pageNumber() {
+
+    pageStateOptions(value) {
       window.history.pushState(
         null,
         document.title,
-        `${window.location.pathname}?filter=${this.filterValue}&page=${this.pageNumber}`
+        `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       )
     }
+
+    // filteredAndPaginatedList() {
+    //   if ((this.filteredAndPaginatedList.length = 0 && this.pageNumber > 1)) {
+    //     this.pageNumber -= 1
+    //   }
+    // }
   },
 
   computed: {
@@ -284,50 +334,31 @@ export default {
       )
     },
 
-    listWithAllFilters() {
+    filteredAndPaginatedList() {
       return this.filteredList.slice(this.startIndex, this.endIndex)
     },
 
-    normalizeGraph() {
+    normalizedGraph() {
       const maxValue = Math.max(...this.graph)
       const minValue = Math.min(...this.graph)
+
+      if (maxValue === minValue) {
+        return this.graph.map(() => 50)
+      }
+
       const newGraph = this.graph.map(
         (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
       )
 
       return newGraph
-    }
-  },
+    },
 
-  created() {
-    const windowData = Object.fromEntries(new URL(window.location).searchParams.entries())
-
-    if (windowData.filter) {
-      this.filterValue = windowData.filter
-    }
-
-    if (windowData.page) {
-      this.pageNumber = windowData.page
-    }
-
-    const tickersList = localStorage.getItem(this.tickersListStorageKey)
-
-    if (tickersList) {
-      this.tickersList = JSON.parse(tickersList)
-
-      for (const ticker of this.tickersList) {
-        this.subscribeToUpdate(ticker.symbol)
+    pageStateOptions() {
+      return {
+        filter: this.filterValue,
+        page: this.pageNumber
       }
     }
-  },
-
-  mounted() {
-    const fetchCurrencyList = async () => {
-      const fetchedCurrency = await getCurrencyList()
-      this.currencyById = fetchedCurrency
-    }
-
-    fetchCurrencyList()
   },
 
   methods: {
@@ -376,13 +407,11 @@ export default {
         price: ' - '
       }
 
-      this.tickersList.push(currentTicker)
-      localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
+      this.tickersList = [...this.tickersList, currentTicker]
       this.subscribeToUpdate(currency.toUpperCase())
     },
 
     handleSelectTicker(ticker) {
-      this.handleCleanGraph()
       this.selectedTicker = ticker
     },
 
@@ -392,34 +421,19 @@ export default {
       )
 
       if (this.selectedTicker && ticker.id === this.selectedTicker.id) {
-        this.handleCleanGraph()
+        this.selectedTicker = null
       }
 
       this.tickersList = newList
-      localStorage.setItem(this.tickersListStorageKey, JSON.stringify(this.tickersList))
     },
-
-    handleCleanGraph() {
-      this.graph = []
-    },
-
-    // normalizeGraph() {
-    //   const maxValue = Math.max(...this.graph)
-    //   const minValue = Math.min(...this.graph)
-    //   const newGraph = this.graph.map(
-    //     (price) => 5 + ((price - minValue) * 95) / (maxValue - minValue)
-    //   )
-
-    //   return newGraph
-    // },
 
     handleClickPageBth(action) {
       if (action === 'next') {
-        this.pageNumber = this.pageNumber + 1
+        this.pageNumber = Number(this.pageNumber) + 1
       }
 
       if (action === 'prev' && this.pageNumber !== 1) {
-        this.pageNumber = this.pageNumber - 1
+        this.pageNumber = Number(this.pageNumber) - 1
       }
     }
   }

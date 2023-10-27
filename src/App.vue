@@ -370,7 +370,15 @@ export default {
     },
 
     updateTickers(tickerName, price) {
-      this.tickersList.filter((t) => t.symbol === tickerName).forEach((t) => (t.price = price))
+      this.tickersList
+        .filter((t) => t.symbol === tickerName)
+        .forEach((t) => {
+          t.price = price
+
+          if (t.symbol === this.selectedTicker.symbol) {
+            this.graph.push(price)
+          }
+        })
     },
 
     async handleAddTicker(currency) {

@@ -2,6 +2,22 @@ const API_KEY = '31ccf75561fc8823fddcafbaf3aaa73a2103801aed07e9b1129e734088f1ec5
 
 const tickersHandlers = new Map();
 
+const socket = new WebSocket(`wss://streamer.cryptocompare.com/v2?api_key=${API_KEY}`)
+
+socket.addEventListener('message', e => {
+    const {TYPE: type, FROMSYMBOL: currency, PRICE: newPrice} = JSON.parse(e.data);
+
+    const AGGREGATE_INDEX = "5";
+
+    if (type !== AGGREGATE_INDEX || newPrice === undefined) {
+        return
+    }
+    
+    const handlers = tickersHandlers.get(currency) ?? [];
+
+    handlers.forEach(fn => fn(newPrice))
+})
+
 export const getCurrencyList = async () => {
   const res = await fetch('https://min-api.cryptocompare.com/data/blockchain/list', {
     method: 'GET',
@@ -14,61 +30,44 @@ export const getCurrencyList = async () => {
   return data.Data
 }
 
-// export const fetchCurrencyPrice = async (name, priceCurrency) => {
-//   const res = await fetch(
-//     `https://min-api.cryptocompare.com/data/price?fsym=${name}&tsyms=${priceCurrency}`,
-//     {
-//       method: 'GET',
-//       headers: {
-//         authorization: `Apikey ${API_KEY}`
-//       }
-//     }
-//   )
+function sendToWebSocket(message) {
+    const stringifyMessage = JSON.stringify(message)
 
-//   const data = await res.json()
-
-//   return data
-// }
-
-
-const loadTickers = async () => {
-    if (tickersHandlers.size === 0) {
-        return
+    if (socket.readyState === socket.OPEN) {
+        socket.send(stringifyMessage);
+        return;
     }
 
-    const res = await fetch(
-        `https://min-api.cryptocompare.com/data/pricemulti?fsyms=${[...tickersHandlers.keys()].join(',')}&tsyms=USD`,
-        {
-        method: 'GET',
-        headers: {
-            authorization: `Apikey ${API_KEY}`
-        }
-        }
-    )
-
-    const rawData = await res.json()
-    const updatedPrices = Object.fromEntries(Object.entries(rawData).map(([key, value]) => [key, value['USD']]))
-
-    Object.entries(updatedPrices).forEach(([currency, newPrice]) => {
-        const handlers = tickersHandlers.get(currency) ?? [];
-
-        handlers.forEach(fn => fn(newPrice))
-    })
+    socket.addEventListener('open', () => {
+        socket.send(stringifyMessage);
+    }, { once: true })
     
+}
 
+
+const subscribeToTickerOnWs = (ticker) => {
+    sendToWebSocket({
+        "action": "SubAdd",
+        "subs": [`5~CCCAGG~${ticker}~USD`]
+    });
+}
+
+const unSubscribeToTickerOnWs = (ticker) => {
+    sendToWebSocket({
+        "action": "SubRemove",
+        "subs": [`5~CCCAGG~${ticker}~USD`]
+    });
 }
 
 export const subscribeToTicker = (ticker, callback) => {
     const subscribers = tickersHandlers.get(ticker) || [];
-
-    tickersHandlers.set(ticker, [...subscribers, callback])
+    tickersHandlers.set(ticker, [...subscribers, callback]);
+    subscribeToTickerOnWs(ticker)
 }
 
 export const unsubscribeToTicker = (ticker) => {
-    console.log('Unsubscribe:', ticker)
     tickersHandlers.delete(ticker)
+    unSubscribeToTickerOnWs(ticker)
 }
 
-
-setInterval(loadTickers, 5000);
 

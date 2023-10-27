@@ -130,7 +130,9 @@
             <dt class="text-sm font-medium text-gray-500 truncate">
               {{ `${ticker.symbol} - USD` }}
             </dt>
-            <dd class="mt-1 text-3xl font-semibold text-gray-900">{{ ticker.price }}</dd>
+            <dd class="mt-1 text-3xl font-semibold text-gray-900">
+              {{ formatPrice(ticker.price) }}
+            </dd>
           </div>
           <div class="w-full border-t border-gray-200"></div>
           <button
@@ -196,7 +198,7 @@
 </template>
 
 <script>
-import { getCurrencyList, fetchCurrencyPrice } from './api'
+import { getCurrencyList, subscribeToTicker, unsubscribeToTicker } from './api'
 
 export default {
   // -- Refactoring --
@@ -252,7 +254,7 @@ export default {
       this.tickersList = JSON.parse(tickersList)
 
       for (const ticker of this.tickersList) {
-        this.subscribeToUpdate(ticker.symbol)
+        subscribeToTicker(ticker.symbol, (newPrice) => this.updateTickers(ticker.symbol, newPrice))
       }
     }
   },
@@ -290,12 +292,6 @@ export default {
         `${window.location.pathname}?filter=${value.filter}&page=${value.page}`
       )
     }
-
-    // filteredAndPaginatedList() {
-    //   if ((this.filteredAndPaginatedList.length = 0 && this.pageNumber > 1)) {
-    //     this.pageNumber -= 1
-    //   }
-    // }
   },
 
   computed: {
@@ -366,28 +362,15 @@ export default {
       return this.tickersList.find((t) => t.symbol.toLowerCase() === symbol.toLowerCase())
     },
 
-    subscribeToUpdate(name) {
-      setInterval(async () => {
-        const fetchedPrice = await fetchCurrencyPrice(name, 'USD')
+    formatPrice(price) {
+      if (price === '-') return price
 
-        if (fetchedPrice?.Response === 'Error') {
-          this.tickersList.find((t) => t.symbol === name).price = ' - '
+      const numberPrice = Number(price)
+      return numberPrice > 1 ? numberPrice.toFixed(2) : numberPrice.toPrecision(2)
+    },
 
-          return
-        }
-
-        const price =
-          fetchedPrice.USD > 1 ? fetchedPrice.USD.toFixed(2) : fetchedPrice.USD.toPrecision(2)
-
-        this.tickersList.find((t) => t.symbol === name).price = price
-
-        if (
-          this.selectedTicker &&
-          this.selectedTicker.symbol.toLowerCase() === name.toLowerCase()
-        ) {
-          this.graph.push(fetchedPrice.USD)
-        }
-      }, 4000)
+    updateTickers(tickerName, price) {
+      this.tickersList.filter((t) => t.symbol === tickerName).forEach((t) => (t.price = price))
     },
 
     async handleAddTicker(currency) {
@@ -404,11 +387,13 @@ export default {
 
       const currentTicker = {
         ...this.currencyById[currency.toUpperCase()],
-        price: ' - '
+        price: '-'
       }
 
       this.tickersList = [...this.tickersList, currentTicker]
-      this.subscribeToUpdate(currency.toUpperCase())
+      subscribeToTicker(currency.toUpperCase(), (newPrice) =>
+        this.updateTickers(currency.toUpperCase(), newPrice)
+      )
     },
 
     handleSelectTicker(ticker) {
@@ -416,7 +401,7 @@ export default {
     },
 
     handleDeleteTicker(ticker) {
-      const newList = this.tickersList.filter(
+      this.tickersList = this.tickersList.filter(
         (t) => t.symbol.toLowerCase() !== ticker.symbol.toLowerCase()
       )
 
@@ -424,7 +409,7 @@ export default {
         this.selectedTicker = null
       }
 
-      this.tickersList = newList
+      unsubscribeToTicker(ticker.symbol)
     },
 
     handleClickPageBth(action) {

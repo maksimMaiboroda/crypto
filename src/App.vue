@@ -124,7 +124,9 @@
           :key="ticker.id"
           @click="handleSelectTicker(ticker)"
           class="bg-white overflow-hidden shadow rounded-lg border-4 border-transparent border-solid cursor-pointer"
-          :class="ticker?.id === selectedTicker?.id && 'border-4 border-purple-800'"
+          :class="`${ticker?.id === selectedTicker?.id && 'border-4 border-purple-800'} ${
+            ticker.price === null && 'bg-red-100'
+          }`"
         >
           <div class="px-4 py-5 sm:p-6 text-center">
             <dt class="text-sm font-medium text-gray-500 truncate">
@@ -199,6 +201,7 @@
 
 <script>
 import { getCurrencyList, subscribeToTicker, unsubscribeToTicker } from './api'
+import { v4 as uuid } from 'uuid'
 
 export default {
   // -- Refactoring --
@@ -326,7 +329,7 @@ export default {
 
     filteredList() {
       return this.tickersList.filter((ticket) =>
-        ticket.symbol.includes(this.filterValue.toUpperCase())
+        ticket.symbol?.includes(this.filterValue.toUpperCase())
       )
     },
 
@@ -363,7 +366,7 @@ export default {
     },
 
     formatPrice(price) {
-      if (price === '-') return price
+      if (price === '-' || price === null) return '-'
 
       const numberPrice = Number(price)
       return numberPrice > 1 ? numberPrice.toFixed(2) : numberPrice.toPrecision(2)
@@ -375,7 +378,7 @@ export default {
         .forEach((t) => {
           t.price = price
 
-          if (t.symbol === this.selectedTicker.symbol) {
+          if (this.selectedTicker && t.symbol === this.selectedTicker.symbol) {
             this.graph.push(price)
           }
         })
@@ -388,14 +391,14 @@ export default {
         return
       }
 
-      if (!this.currencyList.includes(currency.toUpperCase())) return
-
       this.showError = false
       this.filterValue = ''
 
       const currentTicker = {
-        ...this.currencyById[currency.toUpperCase()],
-        price: '-'
+        symbol: currency.toUpperCase(),
+        id: uuid(),
+        price: '-',
+        ...this.currencyById[currency.toUpperCase()]
       }
 
       this.tickersList = [...this.tickersList, currentTicker]

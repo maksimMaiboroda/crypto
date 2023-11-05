@@ -163,13 +163,14 @@
         <h3 class="text-lg leading-6 font-medium text-gray-900 my-8">
           {{ selectedTicker.symbol }} - USD
         </h3>
-        <div class="flex items-end border-gray-600 border-b border-l h-64">
+        <div class="flex items-end border-gray-600 border-b border-l h-64" ref="graph">
           <div
             v-for="(graphItem, index) in normalizedGraph"
             :key="index"
             :style="{ height: `${graphItem}%` }"
             class="bg-purple-800 border w-10"
-          ></div>
+            ref="graphColumn"
+          />
         </div>
         <button @click="() => (this.graph = [])" type="button" class="absolute top-0 right-0">
           <svg
@@ -214,14 +215,14 @@ export default {
   // [ ] 3. Many extra calls to api | Critical: 4
   // [x] 1. The same code in watch | Critical: 3
   // [ ] 7. Graphic looks bad when many prices | Critical: 2
-  // [ ] 9. localStorage and incognito mode | Critical: 2
+  // [H] 9. localStorage and incognito mode | Critical: 2
   // [ ] 10. Magic strings and numbers | Critical: 2
 
   // Also
   //
   // [x] Graphic doesn't work when there are the save value
   // [ ] When delete tickets on last page user should get to previous page if it exists
-  //
+  // [ ] Add Shared Worker wor working with web socket (task which can describe at interview)
   //
   //
   //
@@ -236,6 +237,8 @@ export default {
       isLoading: false,
       showError: false,
       graph: [],
+      maxGraphWith: 0,
+      graphColumnWidth: 0,
       tickersListStorageKey: 'tickets-list',
       pageNumber: 1,
       pageSize: 6
@@ -282,6 +285,15 @@ export default {
 
     selectedTicker() {
       this.graph = []
+    },
+
+    graph: {
+      handler() {
+        if (this.$refs.graphColumn?.[0].clientWidth && !this.graphColumnWidth) {
+          this.graphColumnWidth = this.$refs.graphColumn?.[0].clientWidth
+        }
+      },
+      deep: true
     },
 
     filterValue() {
@@ -340,6 +352,7 @@ export default {
     normalizedGraph() {
       const maxValue = Math.max(...this.graph)
       const minValue = Math.min(...this.graph)
+      this.updateMaxWithGraph()
 
       if (maxValue === minValue) {
         return this.graph.map(() => 50)
@@ -380,8 +393,18 @@ export default {
 
           if (this.selectedTicker && t.symbol === this.selectedTicker.symbol) {
             this.graph.push(price)
+
+            while (this.graph.length > this.maxGraphWith && this.maxGraphWith) {
+              this.graph.shift()
+            }
           }
         })
+    },
+
+    updateMaxWithGraph() {
+      if (this.$refs.graph?.clientWidth && this.graphColumnWidth) {
+        this.maxGraphWith = this.$refs.graph.clientWidth / this.graphColumnWidth
+      }
     },
 
     async handleAddTicker(currency) {

@@ -271,7 +271,13 @@ export default {
       this.currencyById = fetchedCurrency
     }
 
+    window.addEventListener('resize', this.updateMaxWithGraph)
+
     fetchCurrencyList()
+  },
+
+  beforeUnmount() {
+    window.removeEventListener('resize', this.updateMaxWithGraph)
   },
 
   watch: {
@@ -290,7 +296,10 @@ export default {
     graph: {
       handler() {
         if (this.$refs.graphColumn?.[0].clientWidth && !this.graphColumnWidth) {
-          this.graphColumnWidth = this.$refs.graphColumn?.[0].clientWidth
+          this.$nextTick(() => {
+            this.graphColumnWidth = this.$refs.graphColumn?.[0].clientWidth
+            this.updateMaxWithGraph()
+          })
         }
       },
       deep: true
@@ -352,7 +361,6 @@ export default {
     normalizedGraph() {
       const maxValue = Math.max(...this.graph)
       const minValue = Math.min(...this.graph)
-      this.updateMaxWithGraph()
 
       if (maxValue === minValue) {
         return this.graph.map(() => 50)
@@ -432,6 +440,10 @@ export default {
 
     handleSelectTicker(ticker) {
       this.selectedTicker = ticker
+
+      this.$nextTick(() => {
+        this.updateMaxWithGraph()
+      })
     },
 
     handleDeleteTicker(ticker) {
